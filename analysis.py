@@ -7,6 +7,13 @@ import pdb
 import random
 
 RANDOM_SEED = 3
+RESULTS_FNAME = "newcomb-oos-results-2.csv"
+SAVE = False
+EXCLUDED_STUDY_LABELS = (np.nan, 20)
+PAYOFF_DICT = {1.0: (3, 0.05), 2.0: (2.55, 0.45), 3.0: (2.25, 0.75), 12.0: (3, 0.50), 13.0: (2.5, 0.25),
+               14.0: (2.5, 0.25), 15.0: (4, 0.5), 16.0: (4, 0.5), 17.0: (4, 0.5), 18.0: (4, 0.5), 19.0: (2.23, 0.28),
+               20.0: (2.23, 0.11), 21.0: (2.23, 0.11), 22.0: (2, 0.1)}  # Payoffs for (box 1, box 2) in each study
+
 
 
 def balanced_accuracy_score(y_true, y_pred):
@@ -26,7 +33,6 @@ def balanced_accuracy_score(y_true, y_pred):
 if __name__ == "__main__":
   data = pd.read_csv("newcomb-data.csv")
   random.seed(RANDOM_SEED)
-  exluded_study_labels = (np.nan, 20)
 
   # Remove columns not needed for analysis
   cols_to_remove = ["StartDate", "EndDate", "Platform", "IPAddress", "workerId", "Duration__in_seconds_",
@@ -39,7 +45,7 @@ if __name__ == "__main__":
   # Create separate dataframes for each study
   dataframes_for_each_study = {}
   for study_number in data.Study.unique():
-    if not np.isnan(study_number) and study_number not in exluded_study_labels:
+    if not np.isnan(study_number) and study_number not in EXCLUDED_STUDY_LABELS:
       data_for_study = data[data["Study"] == study_number]
 
       # Drop empty columns, then take complete cases (null values are coded as ' ', need to change to nan)
@@ -52,6 +58,8 @@ if __name__ == "__main__":
 
       if data_for_study.shape[0] > 0:
         X_for_study = data_for_study.drop(labels=["newcomb_combined", "Study"], axis=1)
+        X_for_study['payoff1'] = PAYOFF_DICT[study_number][0]
+        X_for_study['payoff2'] = PAYOFF_DICT[study_number][1]
         y_for_study = data_for_study.newcomb_combined
 
         dataframes_for_each_study[study_number] = (X_for_study, y_for_study)
@@ -101,7 +109,8 @@ if __name__ == "__main__":
   # Display and save to csv
   results_df = pd.DataFrame(results).sort_values(by="study_no")
   print(results_df.to_string())
-  results_df.to_csv('newcomb-oos-results-1.csv')
+  if SAVE:
+    results_df.to_csv(RESULTS_FNAME)
 
 
 
