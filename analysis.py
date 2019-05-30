@@ -2,7 +2,8 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_selection import RFE
-from sklearn.metrics import balanced_accuracy_score
+from sklearn.metrics import accuracy_score
+import pdb
 
 
 if __name__ == "__main__":
@@ -19,18 +20,20 @@ if __name__ == "__main__":
 
   # Create separate dataframes for each study
   dataframes_for_each_study = {}
-  for study_number in data.Study.unique() if not study_number in exluded_study_labels:
-    data_for_study = data[data["Study"] == study_number]
+  for study_number in data.Study.unique():
+    if study_number not in exluded_study_labels:
+      data_for_study = data[data["Study"] == study_number]
 
-    # Drop empty columns, then take complete cases (null values are coded as ' ', need to change to nan)
-    data_for_study.replace(' ', np.nan, regex=True)
-    data_for_study.dropna(axis=1, how='all', inplace=True)
-    data_for_study.dropna(axis=0, how='any', inplace=True)
+      # Drop empty columns, then take complete cases (null values are coded as ' ', need to change to nan)
+      data_for_study.replace(' ', np.nan, regex=True)
+      data_for_study.dropna(axis=1, how='all', inplace=True)
+      data_for_study.dropna(axis=0, how='any', inplace=True)
 
-    X_for_study = data_for_study.drop(labels=["newcomb_combined"], axis=1)
-    y_for_study = data_for_study.newcomb_combined
+      if data_for_study.shape[0] > 0:
+        X_for_study = data_for_study.drop(labels=["newcomb_combined"], axis=1)
+        y_for_study = data_for_study.newcomb_combined
 
-    dataframes_for_each_study[study_number] = (X_for_study, y_for_study)
+        dataframes_for_each_study[study_number] = (X_for_study, y_for_study)
 
   # For each study, collect data from other studies with same features, train predictive model, and evaluate
   results = {}
@@ -42,15 +45,17 @@ if __name__ == "__main__":
     overlapping_studies = []
 
     # Build training data
-    for study_number, X_and_y_ in dataframes_for_each_study if study_number != test_study_number:
-      # Check if train study contains same features as test study; if so, add to dataset
-      X_, y_ = X_and_y_
-      if np.array_equal(np.intersect1d(X_.columns, feature_names), feature_names):
-        X_train = pd.concat([X_train, X_[feature_names]])
-        y_train = np.append(y_train, y_)
-        overlapping_studies.append(study_number)
+    for study_number, X_and_y_ in dataframes_for_each_study.items():
+      if study_number != test_study_number:
+        # Check if train study contains same features as test study; if so, add to dataset
+        X_, y_ = X_and_y_
+        if np.array_equal(np.intersect1d(X_.columns, feature_names), feature_names):
+          X_train = pd.concat([X_train, X_[feature_names]])
+          y_train = np.append(y_train, y_)
+          overlapping_studies.append(study_number)
 
-    if overlapping_studies is not None:
+    if overlapping_studies:
+      print('Fitting model for study {}'.format(test_study_number))
       # Fit model
       clf = RandomForestClassifier()
       selector = RFE(clf)
@@ -65,7 +70,7 @@ if __name__ == "__main__":
       # Add to results dict
       study_results = {'train_acc': train_acc, 'test_acc': test_acc, 'selected_features':
                                [n for i, n in enumerate(feature_names) if selector.support_[i]]}
-      results[test)study_number] = study_results
+      results[test_study_number] = study_results
       print('study no {}\n{}'.format(test_study_number, study_results))
 
 
