@@ -4,9 +4,12 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_selection import RFE
 from sklearn.metrics import recall_score
 import pdb
+import random
+
+RANDOM_SEED = 3
 
 
-def balanced_prediction_accuracy(y_true, y_pred):
+def balanced_accuracy_score(y_true, y_pred):
   """
   Assuming y binary.
 
@@ -22,6 +25,7 @@ def balanced_prediction_accuracy(y_true, y_pred):
 
 if __name__ == "__main__":
   data = pd.read_csv("newcomb-data.csv")
+  random.seed(RANDOM_SEED)
   exluded_study_labels = (np.nan, 20)
 
   # Remove columns not needed for analysis
@@ -53,7 +57,8 @@ if __name__ == "__main__":
         dataframes_for_each_study[study_number] = (X_for_study, y_for_study)
 
   # For each study, collect data from other studies with same features, train predictive model, and evaluate
-  results = {'study_no': [], 'oob_score': [], 'test_acc': [], 'selected_features': [], 'studies_used': []}
+  results = {'study_no': [], 'oob_score': [], 'test_acc': [], 'selected_features': [], 'studies_used': [],
+             'random_seed': []}
   for test_study_number, X_and_y_test in dataframes_for_each_study.items():
     X_test, y_test = X_and_y_test
     feature_names = X_test.columns
@@ -91,9 +96,12 @@ if __name__ == "__main__":
       results['selected_features'].append(selected_features)
       results['studies_used'].append(overlapping_studies)
       results['study_no'].append(test_study_number)
+      results['random_seed'].append(RANDOM_SEED)
 
-  # Display
-  print(pd.DataFrame(results).to_string())
+  # Display and save to csv
+  results_df = pd.DataFrame(results).sort_values(by="study_no")
+  print(results_df.to_string())
+  results_df.to_csv('newcomb-oos-results-1.csv')
 
 
 
