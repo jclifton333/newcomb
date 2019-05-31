@@ -14,13 +14,6 @@ RESULTS_FNAME = None
 SAVE = False
 
 
-def estimate_joint_distributions(dataframes_for_each_study):
-  for study_no, X_and_y in dataframes_for_each_study.items():
-    X, _ = X_and_y
-    print(study_no)
-    print(X.education.value_counts(normalize=True))
-
-
 def importance_sampling_analysis(random_seed=RANDOM_SEED, results_fname=RESULTS_FNAME, save=SAVE):
   """
   For each study, fit a predictive model on each of the remaining studies, estimate the joint distribution of the
@@ -36,46 +29,37 @@ def importance_sampling_analysis(random_seed=RANDOM_SEED, results_fname=RESULTS_
   dataframes_for_each_study = utils.split_dataset_by_study(data)
 
   # For each study, collect data from other studies with same features, train predictive model, and evaluate
-  results = {'study_no': [], 'oob_score': [], 'test_acc': [], 'selected_features': [], 'studies_used': [],
-             'random_seed': []}
+  results = {'study_no': [], 'test_acc': []}
   for test_study_number, X_and_y_test in dataframes_for_each_study.items():
     X_test, y_test = X_and_y_test
     feature_names = X_test.columns
-    X_train = pd.DataFrame(columns=feature_names)
-    y_train = np.zeros(0)
-    overlapping_studies = []
+    votes = np.array((0, len(y_test)))  # For storing predictions from each estimator; averaged at end to get final
 
     # Build training data
-    for study_number, X_and_y_ in dataframes_for_each_study.items():
+    for study_number, X_and_y_train in dataframes_for_each_study.items():
       if study_number != test_study_number:
-        # Check if train study contains same features as test study; if so, add to dataset
-        X_, y_ = X_and_y_
-        if np.array_equal(np.intersect1d(X_.columns, feature_names), np.sort(feature_names)):
-          X_train = pd.concat([X_train, X_[feature_names]])
-          y_train = np.append(y_train, y_)
-          overlapping_studies.append(study_number)
+        X_train, y_train = X_and_y_train
 
-    if overlapping_studies:
-      print('Fitting model for study {}'.format(test_study_number))
+        # Fit model on overlapping features
+        overlapping_features = np.intersect1d(X_train.columns, feature_names)
+        X_train = X_train[overlapping_features]
+        clf = RandomForestClassifier(oob_score=True, n_estimators=100)
+        selector = RFECV(clf)
+        selector.fit(X_train, y_train)
 
-      # Fit model
-      clf = RandomForestClassifier(oob_score=True, n_estimators=100)
-      selector = RFECV(clf)
-      selector.fit(X_train, y_train)
+        # Compute prediction on test data and collect
+        selected_features = [n for i, n in enumerate(feature_names) if selector.support_[i]]
+        test_predictions = selector.estimator_.predict_proba(X_test[selected_features])
+        votes = np.vstack((votes, test_predictions))
 
-      # Train and test accuracy
-      selected_features = [n for i, n in enumerate(feature_names) if selector.support_[i]]
-      train_acc = selector.estimator_.oob_score_
-      test_predictions = selector.estimator_.predict(X_test[selected_features])
-      test_acc = balanced_accuracy_score(y_test, test_predictions)
+      # Get final predictions and compute accuracy
+      final_votes = votes.mean(axis=0)
+      final_predictions = (final_votes > 0.5) + 1  # Recode as 1/2
+      test_acc = utils.balanced_accuracy_score(y_test, final_predictions)
 
-      # Add to results dict
-      results['oob_score'].append(train_acc)
-      results['test_acc'].append(test_acc)
-      results['selected_features'].append(selected_features)
-      results['studies_used'].append(overlapping_studies)
-      results['study_no'].append(test_study_number)
-      results['random_seed'].append(RANDOM_SEED)
+      # Collect results
+      results['study_no'] = study_number
+      results['test_acc'] = test_acc
 
   # Display and save to csv
   results_df = pd.DataFrame(results).sort_values(by="study_no")
