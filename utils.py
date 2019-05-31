@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from sklearn.metrics import recall_score
 
 
 def split_dataset_by_study(data, exluded_study_labels=(20,)):

@@ -33,7 +33,7 @@ def importance_sampling_analysis(random_seed=RANDOM_SEED, results_fname=RESULTS_
   for test_study_number, X_and_y_test in dataframes_for_each_study.items():
     X_test, y_test = X_and_y_test
     feature_names = X_test.columns
-    votes = np.array((0, len(y_test)))  # For storing predictions from each estimator; averaged at end to get final
+    votes = np.zeros((0, len(y_test)))  # For storing predictions from each estimator; averaged at end to get final
 
     # Build training data
     for study_number, X_and_y_train in dataframes_for_each_study.items():
@@ -48,18 +48,18 @@ def importance_sampling_analysis(random_seed=RANDOM_SEED, results_fname=RESULTS_
         selector.fit(X_train, y_train)
 
         # Compute prediction on test data and collect
-        selected_features = [n for i, n in enumerate(feature_names) if selector.support_[i]]
-        test_predictions = selector.estimator_.predict_proba(X_test[selected_features])
+        selected_features = [n for i, n in enumerate(overlapping_features) if selector.support_[i]]
+        test_predictions = selector.estimator_.predict_proba(X_test[selected_features])[:, -1]
         votes = np.vstack((votes, test_predictions))
 
-      # Get final predictions and compute accuracy
-      final_votes = votes.mean(axis=0)
-      final_predictions = (final_votes > 0.5) + 1  # Recode as 1/2
-      test_acc = utils.balanced_accuracy_score(y_test, final_predictions)
+    # Get final predictions and compute accuracy
+    final_votes = votes.mean(axis=0)
+    final_predictions = (final_votes > 0.5) + 1  # Recode as 1/2
+    test_acc = utils.balanced_accuracy_score(y_test, final_predictions)
 
-      # Collect results
-      results['study_no'] = study_number
-      results['test_acc'] = test_acc
+    # Collect results
+    results['study_no'] = test_study_number
+    results['test_acc'] = test_acc
 
   # Display and save to csv
   results_df = pd.DataFrame(results).sort_values(by="study_no")
@@ -69,6 +69,4 @@ def importance_sampling_analysis(random_seed=RANDOM_SEED, results_fname=RESULTS_
 
 
 if __name__ == "__main__":
-  data = pd.read_csv("newcomb-data.csv")
-  dataframes_for_each_study = utils.split_dataset_by_study(data)
-  estimate_joint_distributions(dataframes_for_each_study)
+  importance_sampling_analysis()
