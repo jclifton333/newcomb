@@ -21,6 +21,7 @@ def split_dataset_by_study(data, exluded_study_labels=(20,)):
                     "believability_2", "believability_3", "knowing_prediction", "decoding", "feedback", "fair",
                     "long", "hard"]
   data.drop(labels=cols_to_remove, axis=1, inplace=True)
+  data['ethnicity'] = data.ethnicity.astype('category')  # Convert ethnicity coding from numeric to categorical
 
   # Create separate dataframes for each study
   dataframes_for_each_study = {}
@@ -29,7 +30,6 @@ def split_dataset_by_study(data, exluded_study_labels=(20,)):
       data_for_study = data[data["Study"] == study_number]
 
       # Drop empty columns, then take complete cases (null values are coded as ' ', need to change to nan)
-      # ToDo: Ethnicity should be categorical
       data_for_study.replace(' ', np.nan, regex=True, inplace=True)
       data_for_study.dropna(axis=1, how='all', inplace=True)
       data_for_study.dropna(axis=0, how='any', inplace=True)
@@ -58,3 +58,26 @@ def balanced_accuracy_score(y_true, y_pred):
   recall_1 = recall_score(y_true, y_pred, pos_label=y_vals[0])
   recall_2 = recall_score(y_true, y_pred, pos_label=y_vals[1])
   return (recall_1 + recall_2) / 2
+
+
+def bpa_scorer(estimator, X, y):
+  """
+
+  :param estimator:
+  :param X:
+  :param y:
+  :return:
+  """
+  y_pred = estimator.predict(X)
+  return balanced_accuracy_score(y, y_pred)
+
+
+def balanced_accuracy_for_optimal_threshold(y_true, phat):
+  best_accuracy = 0.0
+  for threshold in phat:
+    y_pred = (phat > threshold) + 1
+    bpa = balanced_accuracy_score(y_true, y_pred)
+    if bpa > best_accuracy:
+      best_accuracy = bpa
+  return best_accuracy
+

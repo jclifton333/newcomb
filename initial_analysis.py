@@ -8,8 +8,8 @@ from sklearn.linear_model import LogisticRegression
 import pdb
 import random
 
-RANDOM_SEED = 3
-RESULTS_FNAME = "results/newcomb-oos--rfecv-2-with-payoffs.csv"
+RANDOM_SEED = 4
+RESULTS_FNAME = "results/newcomb-oos--rfecv-3-diff-seed-with-payoffs.csv"
 SAVE = True
 
 
@@ -32,6 +32,7 @@ def studywise_bivariate_analysis(feature_name):
       data_for_study = data_for_study.applymap(float)
       data_for_study = data_for_study[data_for_study["newcomb_combined"] != 0.0]
 
+
       # If there's any data left, fit a logistic regression
       if data_for_study.shape[0] > 0:
         X = data_for_study[feature_name][:, np.newaxis]
@@ -39,10 +40,9 @@ def studywise_bivariate_analysis(feature_name):
         logit = LogisticRegression(C=1e40)
         logit.fit(X, y)
 
-        y_pred = logit.predict(X)
-        bpa = utils.balanced_accuracy_score(y, y_pred)
         results['study_no'].append(study_number)
         results['logit_coef'].append(np.round(logit.coef_[0,0], 2))
+        bpa = utils.balanced_accuracy_for_optimal_threshold(y, logit.predict_proba(X)[:, -1])
         results['logit_score'].append(bpa)
         results['sample_size'].append(X.shape[0])
 
@@ -91,7 +91,7 @@ def leave_one_study_out_analysis(random_seed=RANDOM_SEED, results_fname=RESULTS_
 
       # Fit model
       clf = RandomForestClassifier(oob_score=True, n_estimators=100)
-      selector = RFECV(clf)
+      selector = RFECV(clf, scoring=utils.bpa_scorer)
       selector.fit(X_train, y_train)
 
       # Train and test accuracy
@@ -116,7 +116,5 @@ def leave_one_study_out_analysis(random_seed=RANDOM_SEED, results_fname=RESULTS_
 
 
 if __name__ == "__main__":
-  features_to_analyze = ["dualism", "age", "fad_unpredictability", "education", "faith_intuition"]
-  for f in features_to_analyze:
-    studywise_bivariate_analysis(f)
+  leave_one_study_out_analysis()
 
