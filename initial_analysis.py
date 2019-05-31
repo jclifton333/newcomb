@@ -3,6 +3,7 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_selection import RFE, RFECV
 from sklearn.metrics import recall_score
+import utils
 from sklearn.linear_model import LogisticRegression
 import pdb
 import random
@@ -10,20 +11,6 @@ import random
 RANDOM_SEED = 3
 RESULTS_FNAME = "results/newcomb-oos--rfecv-2-with-payoffs.csv"
 SAVE = True
-
-
-def balanced_accuracy_score(y_true, y_pred):
-  """
-  Assuming y binary.
-
-  :param y_pred:
-  :param y_true:
-  :return:
-  """
-  y_vals = np.unique(y_true)
-  recall_1 = recall_score(y_true, y_pred, pos_label=y_vals[0])
-  recall_2 = recall_score(y_true, y_pred, pos_label=y_vals[1])
-  return (recall_1 + recall_2) / 2
 
 
 def studywise_bivariate_analysis(feature_name):
@@ -34,7 +21,7 @@ def studywise_bivariate_analysis(feature_name):
   :return:
   """
   data = pd.read_csv("newcomb-data.csv")
-  results = {'study_no': [], 'logit_coef': [], 'logit_score': []}
+  results = {'study_no': [], 'logit_coef': [], 'logit_score': [], 'sample_size': []}
   for study_number in data.Study.unique():
     if np.isfinite(study_number):
       # Get complete cases of target and specified feature
@@ -53,10 +40,11 @@ def studywise_bivariate_analysis(feature_name):
         logit.fit(X, y)
 
         y_pred = logit.predict(X)
-        bpa = balanced_accuracy_score(y, y_pred)
+        bpa = utils.balanced_accuracy_score(y, y_pred)
         results['study_no'].append(study_number)
         results['logit_coef'].append(np.round(logit.coef_[0,0], 2))
         results['logit_score'].append(bpa)
+        results['sample_size'].append(X.shape[0])
 
   # Display
   results_df = pd.DataFrame(results).sort_values(by="study_no")
@@ -74,41 +62,9 @@ def leave_one_study_out_analysis(random_seed=RANDOM_SEED, results_fname=RESULTS_
   :param save:
   :return:
   """
-  EXCLUDED_STUDY_LABELS = (np.nan, 20)
-  PAYOFF_DICT = {1.0: (3, 0.05), 2.0: (2.55, 0.45), 3.0: (2.25, 0.75), 12.0: (3, 0.50), 13.0: (2.5, 0.25),
-                 14.0: (2.5, 0.25), 15.0: (4, 0.5), 16.0: (4, 0.5), 17.0: (4, 0.5), 18.0: (4, 0.5), 19.0: (2.23, 0.28),
-                 20.0: (2.23, 0.11), 21.0: (2.23, 0.11), 22.0: (2, 0.1)}  # Payoffs for (box 1, box 2) in each study
   data = pd.read_csv("newcomb-data.csv")
   random.seed(random_seed)
-
-  # Remove columns not needed for analysis
-  cols_to_remove = ["StartDate", "EndDate", "Platform", "IPAddress", "workerId", "Duration__in_seconds_",
-                    "RecordedDate", "newcomb_explanation", "newcomb_two_explain", "newcomb_confidence",
-                    "comprehension", "believability_prediction", "believability_scenario", "believability_1",
-                    "believability_2", "believability_3", "knowing_prediction", "decoding", "feedback", "fair",
-                    "long", "hard"]
-  data.drop(labels=cols_to_remove, axis=1, inplace=True)
-
-  # Create separate dataframes for each study
-  dataframes_for_each_study = {}
-  for study_number in data.Study.unique():
-    if not np.isnan(study_number) and study_number not in EXCLUDED_STUDY_LABELS:
-      data_for_study = data[data["Study"] == study_number]
-
-      # Drop empty columns, then take complete cases (null values are coded as ' ', need to change to nan)
-      data_for_study.replace(' ', np.nan, regex=True, inplace=True)
-      data_for_study.dropna(axis=1, how='all', inplace=True)
-      data_for_study.dropna(axis=0, how='any', inplace=True)
-      data_for_study = data_for_study.applymap(float)
-      data_for_study = data_for_study[data_for_study["newcomb_combined"] != 0.0]
-      print("Study {} data size {}".format(study_number, data_for_study.shape))
-
-      if data_for_study.shape[0] > 0:
-        X_for_study = data_for_study.drop(labels=["newcomb_combined", "Study"], axis=1)
-        X_for_study['payoff1'] = PAYOFF_DICT[study_number][0]
-        X_for_study['payoff2'] = PAYOFF_DICT[study_number][1]
-        y_for_study = data_for_study.newcomb_combined
-        dataframes_for_each_study[study_number] = (X_for_study, y_for_study)
+  dataframes_for_each_study = utils.split_dataset_by_study(data)
 
   # For each study, collect data from other studies with same features, train predictive model, and evaluate
   results = {'study_no': [], 'oob_score': [], 'test_acc': [], 'selected_features': [], 'studies_used': [],
@@ -142,7 +98,7 @@ def leave_one_study_out_analysis(random_seed=RANDOM_SEED, results_fname=RESULTS_
       selected_features = [n for i, n in enumerate(feature_names) if selector.support_[i]]
       train_acc = selector.estimator_.oob_score_
       test_predictions = selector.estimator_.predict(X_test[selected_features])
-      test_acc = balanced_accuracy_score(y_test, test_predictions)
+      test_acc = utils.balanced_accuracy_score(y_test, test_predictions)
 
       # Add to results dict
       results['oob_score'].append(train_acc)
@@ -160,7 +116,7 @@ def leave_one_study_out_analysis(random_seed=RANDOM_SEED, results_fname=RESULTS_
 
 
 if __name__ == "__main__":
-  features_to_analyze = ["age", "fad_unpredictability", "education", "faith_intuition"]
+  features_to_analyze = ["dualism", "age", "fad_unpredictability", "education", "faith_intuition"]
   for f in features_to_analyze:
     studywise_bivariate_analysis(f)
 
