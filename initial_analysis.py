@@ -20,12 +20,21 @@ def studywise_logistic_regression(feature_names):
   :param features_name:
   :return:
   """
+  PAYOFF_DICT = {1.0: (3, 0.05), 2.0: (2.55, 0.45), 3.0: (2.25, 0.75), 12.0: (3, 0.50), 13.0: (2.5, 0.25),
+                 14.0: (2.5, 0.25), 15.0: (4, 0.5), 16.0: (4, 0.5), 17.0: (4, 0.5), 18.0: (4, 0.5), 19.0: (2.23, 0.28),
+                 20.0: (2.23, 0.11), 21.0: (2.23, 0.11), 22.0: (2, 0.1)}  # Payoffs for (box 1, box 2) in each study
+
   data = pd.read_csv("newcomb-data.csv")
-  results = {'study_no': [], 'logit_coef': [], 'logit_score': [], 'num 1 boxers': [], 'sample_size': []}
+  results = {'study_no': [], 'logit_coef': [], 'logit_score': [], 'payoff1': [], 'payoff2': [], 'sample_size': []}
   for study_number in data.Study.unique():
     if np.isfinite(study_number):
       # Get complete cases of target and specified feature
       data_for_study = data[data["Study"] == study_number]
+      data_for_study['payoff1'] = PAYOFF_DICT[study_number][0]
+      data_for_study['payoff2'] = PAYOFF_DICT[study_number][1]
+      payoff1 = np.array(data_for_study.payoff1)[0]
+      payoff2 = np.array(data_for_study.payoff2)[0]
+      payoffRatio = payoff1 / payoff2
       data_for_study = data_for_study[feature_names + ["newcomb_combined"]]
       data_for_study.replace(' ', np.nan, regex=True, inplace=True)
       data_for_study.dropna(axis=0, inplace=True)
@@ -45,7 +54,8 @@ def studywise_logistic_regression(feature_names):
           coef_str += ' {}: {}'.format(feature_name, np.round(logit.coef_[0, ix], 2))
 
         results['study_no'].append(study_number)
-        results['num 1 boxers'].append(np.round(np.mean(y == 2), 2))
+        results['payoff1'].append(np.round(payoff1, 2))
+        results['payoff2'].append(np.round(payoff2, 2))
         results['logit_coef'].append(coef_str)
         bpa = utils.balanced_accuracy_score(y, logit.predict(X))
         # bpa = utils.balanced_accuracy_for_optimal_threshold(y, logit.predict_proba(X)[:, -1])
@@ -56,10 +66,20 @@ def studywise_logistic_regression(feature_names):
   results_df = pd.DataFrame(results).sort_values(by="study_no")
   print('\n{}'.format(results_df.to_string()))
 
+  return results_df
+
+
+def summary_statistics(feature_names, excluded_studies=(21,)):
+  data = pd.read_csv("newcomb-data.csv")
+  dataframes_for_each_study = utils.split_dataset_by_study(data, feature_names, excluded_study_labels=excluded_studies)
+  for study_no, X_and_y in dataframes_for_each_study.items():
+    X, _ = X_and_y
+    print('\nStudy {}\n{}'.format(study_no, X.describe().to_string()))
   return
 
 
 def leave_one_study_out_analysis(feature_names=None, clf=RandomForestClassifier(oob_score=True, n_estimators=100),
+                                 excluded_studies=(20,),
                                  random_seed=RANDOM_SEED,
                                  results_fname=RESULTS_FNAME, save=SAVE):
   """
@@ -73,7 +93,7 @@ def leave_one_study_out_analysis(feature_names=None, clf=RandomForestClassifier(
   """
   data = pd.read_csv("newcomb-data.csv")
   random.seed(random_seed)
-  dataframes_for_each_study = utils.split_dataset_by_study(data, feature_names)
+  dataframes_for_each_study = utils.split_dataset_by_study(data, feature_names, excluded_study_labels=excluded_studies)
   clf_name = clf.__class__.__name__
   results_fname = results_fname.format(clf_name)
 
@@ -127,7 +147,8 @@ def leave_one_study_out_analysis(feature_names=None, clf=RandomForestClassifier(
 
 
 if __name__ == "__main__":
-  clf = LogisticRegression()
-  feature_names = ["dualism", "knights_knaves", "gender", "age"]
-  leave_one_study_out_analysis(feature_names=feature_names, clf=clf)
+  feature_names = ["gender", "knights_knaves"]
+  excluded_studies = (1, 2, 3, 21)
+  summary_statistics(feature_names, excluded_studies=excluded_studies)
+
 

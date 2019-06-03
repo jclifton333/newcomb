@@ -3,7 +3,7 @@ import pandas as pd
 from sklearn.metrics import recall_score
 
 
-def split_dataset_by_study(data, feature_names, exluded_study_labels=(20,)):
+def split_dataset_by_study(data, feature_names, excluded_study_labels=(20,)):
   """
 
   :param data: Pandas df containing full newcomb data.
@@ -33,7 +33,7 @@ def split_dataset_by_study(data, feature_names, exluded_study_labels=(20,)):
   # Create separate dataframes for each study
   dataframes_for_each_study = {}
   for study_number in data.Study.unique():
-    if not np.isnan(study_number) and study_number not in exluded_study_labels:
+    if not np.isnan(study_number) and study_number not in excluded_study_labels:
       data_for_study = data[data["Study"] == study_number]
 
       # Drop empty columns, then take complete cases (null values are coded as ' ', need to change to nan)
