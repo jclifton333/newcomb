@@ -3,7 +3,7 @@ import pandas as pd
 from sklearn.metrics import recall_score
 
 
-def split_dataset_by_study(data, exluded_study_labels=(20,)):
+def split_dataset_by_study(data, feature_names, exluded_study_labels=(20,)):
   """
 
   :param data: Pandas df containing full newcomb data.
@@ -20,8 +20,15 @@ def split_dataset_by_study(data, exluded_study_labels=(20,)):
                     "comprehension", "believability_prediction", "believability_scenario", "believability_1",
                     "believability_2", "believability_3", "knowing_prediction", "decoding", "feedback", "fair",
                     "long", "hard"]
+  # Also drop cols that aren't provided in feature_names
+  if feature_names is not None:
+    for col in data.columns:
+      if col not in ["Study", "newcomb_combined"] and col not in feature_names:
+        cols_to_remove.append(col)
+
   data.drop(labels=cols_to_remove, axis=1, inplace=True)
-  data['ethnicity'] = data.ethnicity.astype('category')  # Convert ethnicity coding from numeric to categorical
+  if 'ethnicity' in data.columns:
+    data['ethnicity'] = data.ethnicity.astype('category')  # Convert ethnicity coding from numeric to categorical
 
   # Create separate dataframes for each study
   dataframes_for_each_study = {}
@@ -41,6 +48,7 @@ def split_dataset_by_study(data, exluded_study_labels=(20,)):
         X_for_study = data_for_study.drop(labels=["newcomb_combined", "Study"], axis=1)
         X_for_study['payoff1'] = PAYOFF_DICT[study_number][0]
         X_for_study['payoff2'] = PAYOFF_DICT[study_number][1]
+        X_for_study['payoffRatio'] = X_for_study.payoff1 / X_for_study.payoff2
         y_for_study = data_for_study.newcomb_combined
         dataframes_for_each_study[study_number] = (X_for_study, y_for_study)
   return dataframes_for_each_study
@@ -74,10 +82,12 @@ def bpa_scorer(estimator, X, y):
 
 def balanced_accuracy_for_optimal_threshold(y_true, phat):
   best_accuracy = 0.0
+  best_threshold = None
   for threshold in phat:
     y_pred = (phat > threshold) + 1
     bpa = balanced_accuracy_score(y_true, y_pred)
     if bpa > best_accuracy:
+      best_threshold = threshold
       best_accuracy = bpa
-  return best_accuracy
+  return best_accuracy, best_threshold
 

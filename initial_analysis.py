@@ -9,54 +9,63 @@ import pdb
 import random
 
 RANDOM_SEED = 4
-RESULTS_FNAME = "results/newcomb-oos--rfecv-3-diff-seed-with-payoffs.csv"
+RESULTS_FNAME = "results/newcomb-oos--rfecv-estimator={}-restricted-features.csv"
 SAVE = True
 
 
-def studywise_bivariate_analysis(feature_name):
+def studywise_logistic_regression(feature_names):
   """
   Analyze relationship between single feature and p(one box) across studies.
 
-  :param feature_name:
+  :param features_name:
   :return:
   """
   data = pd.read_csv("newcomb-data.csv")
-  results = {'study_no': [], 'logit_coef': [], 'logit_score': [], 'sample_size': []}
+  results = {'study_no': [], 'logit_coef': [], 'logit_score': [], 'num 1 boxers': [], 'sample_size': []}
   for study_number in data.Study.unique():
     if np.isfinite(study_number):
       # Get complete cases of target and specified feature
       data_for_study = data[data["Study"] == study_number]
-      data_for_study = data_for_study[[feature_name, "newcomb_combined"]]
+      data_for_study = data_for_study[feature_names + ["newcomb_combined"]]
       data_for_study.replace(' ', np.nan, regex=True, inplace=True)
       data_for_study.dropna(axis=0, inplace=True)
       data_for_study = data_for_study.applymap(float)
       data_for_study = data_for_study[data_for_study["newcomb_combined"] != 0.0]
 
-
       # If there's any data left, fit a logistic regression
       if data_for_study.shape[0] > 0:
-        X = data_for_study[feature_name][:, np.newaxis]
+        X = data_for_study[feature_names]
         y = data_for_study.newcomb_combined
         logit = LogisticRegression(C=1e40)
         logit.fit(X, y)
 
+        # Construct string to display coef for each feature
+        coef_str = ''
+        for ix, feature_name in enumerate(feature_names):
+          coef_str += ' {}: {}'.format(feature_name, np.round(logit.coef_[0, ix], 2))
+
         results['study_no'].append(study_number)
-        results['logit_coef'].append(np.round(logit.coef_[0,0], 2))
-        bpa = utils.balanced_accuracy_for_optimal_threshold(y, logit.predict_proba(X)[:, -1])
+        results['num 1 boxers'].append(np.round(np.mean(y == 2), 2))
+        results['logit_coef'].append(coef_str)
+        bpa = utils.balanced_accuracy_score(y, logit.predict(X))
+        # bpa = utils.balanced_accuracy_for_optimal_threshold(y, logit.predict_proba(X)[:, -1])
         results['logit_score'].append(bpa)
         results['sample_size'].append(X.shape[0])
 
   # Display
   results_df = pd.DataFrame(results).sort_values(by="study_no")
-  print('\nFeature: {}\n{}'.format(feature_name, results_df.to_string()))
+  print('\n{}'.format(results_df.to_string()))
 
   return
 
 
-def leave_one_study_out_analysis(random_seed=RANDOM_SEED, results_fname=RESULTS_FNAME, save=SAVE):
+def leave_one_study_out_analysis(feature_names=None, clf=RandomForestClassifier(oob_score=True, n_estimators=100),
+                                 random_seed=RANDOM_SEED,
+                                 results_fname=RESULTS_FNAME, save=SAVE):
   """
   For each study, fit a predictive model on data from previous studies which share the target study's features.
 
+  :param feature_names: list of strings or None; if provided, use only these features in the analysis.
   :param random_seed:
   :param results_fname:
   :param save:
@@ -64,10 +73,12 @@ def leave_one_study_out_analysis(random_seed=RANDOM_SEED, results_fname=RESULTS_
   """
   data = pd.read_csv("newcomb-data.csv")
   random.seed(random_seed)
-  dataframes_for_each_study = utils.split_dataset_by_study(data)
+  dataframes_for_each_study = utils.split_dataset_by_study(data, feature_names)
+  clf_name = clf.__class__.__name__
+  results_fname = results_fname.format(clf_name)
 
   # For each study, collect data from other studies with same features, train predictive model, and evaluate
-  results = {'study_no': [], 'oob_score': [], 'test_acc': [], 'selected_features': [], 'studies_used': [],
+  results = {'study_no': [], 'train_acc': [], 'test_acc': [], 'selected_features': [], 'studies_used': [],
              'random_seed': []}
   for test_study_number, X_and_y_test in dataframes_for_each_study.items():
     X_test, y_test = X_and_y_test
@@ -90,18 +101,18 @@ def leave_one_study_out_analysis(random_seed=RANDOM_SEED, results_fname=RESULTS_
       print('Fitting model for study {}'.format(test_study_number))
 
       # Fit model
-      clf = RandomForestClassifier(oob_score=True, n_estimators=100)
-      selector = RFECV(clf, scoring=utils.bpa_scorer)
+      selector = RFECV(clf)
       selector.fit(X_train, y_train)
 
       # Train and test accuracy
       selected_features = [n for i, n in enumerate(feature_names) if selector.support_[i]]
-      train_acc = selector.estimator_.oob_score_
-      test_predictions = selector.estimator_.predict(X_test[selected_features])
+      train_predictions = selector.estimator_.predict_proba(X_train[selected_features])[:, -1]
+      train_acc, threshold = utils.balanced_accuracy_for_optimal_threshold(y_train, train_predictions)
+      test_predictions = (selector.estimator_.predict_proba(X_test[selected_features])[:, -1] > threshold) + 1
       test_acc = utils.balanced_accuracy_score(y_test, test_predictions)
 
       # Add to results dict
-      results['oob_score'].append(train_acc)
+      results['train_acc'].append(train_acc)
       results['test_acc'].append(test_acc)
       results['selected_features'].append(selected_features)
       results['studies_used'].append(overlapping_studies)
@@ -116,5 +127,7 @@ def leave_one_study_out_analysis(random_seed=RANDOM_SEED, results_fname=RESULTS_
 
 
 if __name__ == "__main__":
-  leave_one_study_out_analysis()
+  clf = LogisticRegression()
+  feature_names = ["dualism", "knights_knaves", "gender", "age"]
+  leave_one_study_out_analysis(feature_names=feature_names, clf=clf)
 
