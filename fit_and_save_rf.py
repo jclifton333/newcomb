@@ -34,19 +34,19 @@ def fit_and_save_test_rf(model_fname, feature_names):
 
 
 if __name__ == "__main__":
-  feature_names = ["gender", "age", "dualism", "payoff1", "payoff2"]
+  feature_names = ["gender", "age",  "payoff1", "payoff2"]
   model_fname = "test_model.sav"
 
   # Fit and save model
   fit_and_save_test_rf(model_fname, feature_names)
 
   # Load model and data to get test datapoint
-  test_model = pkl.load(open("test_model.sav"))
+  test_model = pkl.load(open("test_model.sav", "rb"))
   data = pd.read_csv("newcomb-data.csv")
   x_test = [[1, 30, 20, 3, 0.5]]
 
   # Run model on test point
-  test_model.predict(x_test)
+  print(test_model.predict(x_test))
 
 
 
