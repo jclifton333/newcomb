@@ -148,7 +148,6 @@ def leave_one_study_out_analysis(feature_names=None, clf=RandomForestClassifier(
 
 if __name__ == "__main__":
   feature_names = ["gender", "knights_knaves"]
-  excluded_studies = (1, 2, 3, 21)
-  summary_statistics(feature_names, excluded_studies=excluded_studies)
+  studywise_logistic_regression(feature_names)
 
 
