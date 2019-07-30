@@ -8,7 +8,7 @@ from sklearn.linear_model import LogisticRegression
 import pdb
 import random
 
-RANDOM_SEED = 4
+RANDOM_SEED = 3
 RESULTS_FNAME = "results/newcomb-oos--rfecv-estimator={}-restricted-features.csv"
 SAVE = True
 
@@ -81,7 +81,7 @@ def summary_statistics(feature_names, excluded_studies=(21,)):
 def leave_one_study_out_analysis(feature_names=None, clf=RandomForestClassifier(oob_score=True, n_estimators=100),
                                  excluded_studies=(20,),
                                  random_seed=RANDOM_SEED,
-                                 results_fname=RESULTS_FNAME, save=SAVE):
+                                 results_fname=RESULTS_FNAME, save=SAVE, excluded_participants=None):
   """
   For each study, fit a predictive model on data from previous studies which share the target study's features.
 
@@ -93,7 +93,7 @@ def leave_one_study_out_analysis(feature_names=None, clf=RandomForestClassifier(
   """
   data = pd.read_csv("newcomb-data.csv")
   random.seed(random_seed)
-  dataframes_for_each_study = utils.split_dataset_by_study(data, feature_names, excluded_study_labels=excluded_studies)
+  dataframes_for_each_study = utils.split_dataset_by_study(data, feature_names, excluded_study_labels=excluded_studies,excluded_participants=excluded_participants)
   clf_name = clf.__class__.__name__
   results_fname = results_fname.format(clf_name)
 
@@ -137,14 +137,14 @@ def leave_one_study_out_analysis(feature_names=None, clf=RandomForestClassifier(
       results['selected_features'].append(selected_features)
       results['studies_used'].append(overlapping_studies)
       results['study_no'].append(test_study_number)
-      results['random_seed'].append(RANDOM_SEED)
+      results['random_seed'].append(random_seed)
 
   # Display and save to csv
   results_df = pd.DataFrame(results).sort_values(by="study_no")
   print(results_df.to_string())
   if save:
     results_df.to_csv(results_fname)
-
+  return results_df
 
 if __name__ == "__main__":
   feature_names = ["gender", "knights_knaves"]
