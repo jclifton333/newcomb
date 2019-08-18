@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_selection import RFE, RFECV
+from analysis_with_exclusions import excluded_participants_rule_1
 from sklearn.metrics import recall_score
 import utils
 from sklearn.linear_model import LogisticRegression
@@ -146,8 +147,30 @@ def leave_one_study_out_analysis(feature_names=None, clf=RandomForestClassifier(
     results_df.to_csv(results_fname)
   return results_df
 
+
+def leave_one_study_out_with_many_seeds(feature_names=None,
+                                        clf=RandomForestClassifier(oob_score=True, n_estimators=100),
+                                        excluded_studies=(20,),
+                                        num_random_seeds=100,
+                                        excluded_participants=excluded_participants_rule_1):
+
+  mean_test_accuracy = None  # Initialize array of studywise mean test accuracies across seeds
+  for seed in range(num_random_seeds):
+    # ToDo; inefficient since leave_one_study_out_analysis loads and organizes data for every seed?
+    results_df_for_seed = leave_one_study_out_analysis(feature_names=feature_names, clf=clf,
+                                                       excluded_studies=excluded_studies, save=False,
+                                                       excluded_participants=excluded_participants)
+    if mean_test_accuracy is None:
+      mean_test_accuracy = results_df_for_seed.test_acc
+    else:  # Incremental update to means
+      mean_test_accuracy += (results_df_for_seed - mean_test_accuracy) / (seed + 1)
+
+  results_dict = {'mean_test_acc': mean_test_accuracy, 'study_no': results_df_for_seed.study_no}
+  results_df = pd.DataFrame(results_dict)
+  print(results_df.to_string())
+
+
 if __name__ == "__main__":
-  feature_names = ["gender", "knights_knaves"]
-  studywise_logistic_regression(feature_names)
+  leave_one_study_out_with_many_seeds(num_random_seeds=1)
 
 
