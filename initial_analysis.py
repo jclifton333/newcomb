@@ -25,7 +25,7 @@ def studywise_logistic_regression(feature_names):
                  14.0: (2.5, 0.25), 15.0: (4, 0.5), 16.0: (4, 0.5), 17.0: (4, 0.5), 18.0: (4, 0.5), 19.0: (2.23, 0.28),
                  20.0: (2.23, 0.11), 21.0: (2.23, 0.11), 22.0: (2, 0.1)}  # Payoffs for (box 1, box 2) in each study
 
-  data = pd.read_csv("newcomb-data.csv")
+  data = pd.read_csv("newcomb-data-1.csv")
   results = {'study_no': [], 'logit_coef': [], 'logit_score': [], 'payoff1': [], 'payoff2': [], 'sample_size': []}
   for study_number in data.Study.unique():
     if np.isfinite(study_number):
@@ -148,29 +148,8 @@ def leave_one_study_out_analysis(feature_names=None, clf=RandomForestClassifier(
   return results_df
 
 
-def leave_one_study_out_with_many_seeds(feature_names=None,
-                                        clf=RandomForestClassifier(oob_score=True, n_estimators=100),
-                                        excluded_studies=(20,),
-                                        num_random_seeds=100,
-                                        excluded_participants=excluded_participants_rule_1):
-
-  mean_test_accuracy = None  # Initialize array of studywise mean test accuracies across seeds
-  for seed in range(num_random_seeds):
-    # ToDo; inefficient since leave_one_study_out_analysis loads and organizes data for every seed?
-    results_df_for_seed = leave_one_study_out_analysis(feature_names=feature_names, clf=clf,
-                                                       excluded_studies=excluded_studies, save=False,
-                                                       excluded_participants=excluded_participants)
-    if mean_test_accuracy is None:
-      mean_test_accuracy = results_df_for_seed.test_acc
-    else:  # Incremental update to means
-      mean_test_accuracy += (results_df_for_seed - mean_test_accuracy) / (seed + 1)
-
-  results_dict = {'mean_test_acc': mean_test_accuracy, 'study_no': results_df_for_seed.study_no}
-  results_df = pd.DataFrame(results_dict)
-  print(results_df.to_string())
-
-
 if __name__ == "__main__":
-  leave_one_study_out_with_many_seeds(num_random_seeds=1)
+  pass
+  # leave_one_study_out_with_many_seeds(num_random_seeds=1)
 
 
