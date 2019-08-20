@@ -50,14 +50,14 @@ def split_dataset_by_study(data, feature_names, excluded_study_labels=(20,),excl
   # Create separate dataframes for each study
   dataframes_for_each_study = {}
   for study_number in data.Study.unique():
-    if not np.isnan(study_number) and study_number not in excluded_study_labels:
+    if study_number not in excluded_study_labels:
       data_for_study = data[data["Study"] == study_number]
 
       # Drop empty columns, then take complete cases (null values are coded as ' ', need to change to nan)
       data_for_study.replace(' ', np.nan, regex=True, inplace=True)
       data_for_study.dropna(axis=1, how='all', inplace=True)
       data_for_study.dropna(axis=0, how='any', inplace=True)
-      data_for_study = data_for_study.applymap(float)
+      data_for_study = data_for_study.applymap(float)  # ToDo: what about categorical vars?
 
       if data_for_study.shape[0] > 0:
         data_for_study = data_for_study[data_for_study["newcomb_combined"] != 0.0]
@@ -74,11 +74,11 @@ def split_dataset_by_study(data, feature_names, excluded_study_labels=(20,),excl
                                                                 "believability_scenario", "believability_1",
                                                                 "believability_2"] if x in data_for_study.columns],
                                             axis=1)
-          X_for_study['payoff1'] = PAYOFF_DICT[study_number][0]
-          X_for_study['payoff2'] = PAYOFF_DICT[study_number][1]
+          X_for_study['payoff1'] = PAYOFF_DICT[float(study_number)][0]
+          X_for_study['payoff2'] = PAYOFF_DICT[float(study_number)][1]
           X_for_study['payoffRatio'] = X_for_study.payoff1 / X_for_study.payoff2
           y_for_study = data_for_study.newcomb_combined
-          dataframes_for_each_study[study_number] = (X_for_study, y_for_study)
+          dataframes_for_each_study[float(study_number)] = (X_for_study, y_for_study)
   return dataframes_for_each_study
 
 
