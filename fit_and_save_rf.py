@@ -25,7 +25,7 @@ def fit_and_save_test_rf(model_fname, feature_names):
 
   # Fit model on merged dataset
   null_ixs = X.isnull().any(axis=1)
-  y = y[null_ixs]
+  y = y[np.where(null_ixs == 0)]
   X.dropna(axis=0, how='any', inplace=True)
   clf = RandomForestClassifier(n_estimators=100)
   clf.fit(X, y)
@@ -47,7 +47,7 @@ if __name__ == "__main__":
   # Load model and data to get test datapoint
   test_model = pkl.load(open(model_fname, "rb"))
   # data = pd.read_csv("newcomb-data.csv")
-  x_test = [[1, 30, 20, 3, 0.5]]
+  x_test = [[30, 20, 3, 0.5]]
 
   # Run model on test point
   print(test_model.predict(x_test))
