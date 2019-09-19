@@ -118,5 +118,6 @@ def leave_one_study_out_with_many_seeds(label, feature_names=None,
   if save:
     results_df_for_all_seeds.to_csv('results-many-seeds-{}.csv'.format(label))
 
+
 if __name__ == "__main__":
-  leave_one_study_out_with_many_seeds(0, num_random_seeds=2, save=True)
+  leave_one_study_out_with_many_seeds(0, num_random_seeds=100, save=True)

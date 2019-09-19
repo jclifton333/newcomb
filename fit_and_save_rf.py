@@ -24,6 +24,9 @@ def fit_and_save_test_rf(model_fname, feature_names):
     y = np.append(y, y_)
 
   # Fit model on merged dataset
+  null_ixs = X.isnull().any(axis=1)
+  y = y[null_ixs]
+  X.dropna(axis=0, how='any', inplace=True)
   clf = RandomForestClassifier(n_estimators=100)
   clf.fit(X, y)
 
@@ -34,15 +37,16 @@ def fit_and_save_test_rf(model_fname, feature_names):
 
 
 if __name__ == "__main__":
-  feature_names = ["gender", "age",  "payoff1", "payoff2"]
-  model_fname = "test_model.sav"
+  feature_names = ["fad_unpredictability", "determinism", "faith_intuition", "need_for_cognition"]
+  model_fname = "model-4-features-9-19.sav"
 
   # Fit and save model
+  # ToDo: exclude based on comprehension?
   fit_and_save_test_rf(model_fname, feature_names)
 
   # Load model and data to get test datapoint
-  test_model = pkl.load(open("test_model.sav", "rb"))
-  data = pd.read_csv("newcomb-data.csv")
+  test_model = pkl.load(open(model_fname, "rb"))
+  # data = pd.read_csv("newcomb-data.csv")
   x_test = [[1, 30, 20, 3, 0.5]]
 
   # Run model on test point

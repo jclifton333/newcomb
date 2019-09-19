@@ -38,11 +38,10 @@ def split_dataset_by_study(data, feature_names, excluded_study_labels=(20,),excl
   cols_to_remove = []
   for col in data.columns:
     # if col not in cols_to_keep and col not in feature_names:
-    if col not in cols_to_keep:
+    if col not in feature_names + ['Study', 'newcomb_combined']:
       cols_to_remove.append(col)
 
   data.drop(labels=cols_to_remove, axis=1, inplace=True)
-
   if 'ethnicity' in data.columns:
     # data['ethnicity'] = data.ethnicity.astype('category')  # Convert ethnicity coding from numeric to categorical
     data['ethnicity'] = data.ethnicity.astype(str)  # Convert ethnicity coding from numeric to categorical
@@ -58,7 +57,6 @@ def split_dataset_by_study(data, feature_names, excluded_study_labels=(20,),excl
       data_for_study.dropna(axis=1, how='all', inplace=True)
       data_for_study.dropna(axis=0, how='any', inplace=True)
       data_for_study = data_for_study.applymap(float)  # ToDo: what about categorical vars?
-
       if data_for_study.shape[0] > 0:
         data_for_study = data_for_study[data_for_study["newcomb_combined"] != 0.0]
 
@@ -74,9 +72,9 @@ def split_dataset_by_study(data, feature_names, excluded_study_labels=(20,),excl
                                                                 "believability_scenario", "believability_1",
                                                                 "believability_2"] if x in data_for_study.columns],
                                             axis=1)
-          X_for_study['payoff1'] = PAYOFF_DICT[float(study_number)][0]
-          X_for_study['payoff2'] = PAYOFF_DICT[float(study_number)][1]
-          X_for_study['payoffRatio'] = X_for_study.payoff1 / X_for_study.payoff2
+          if 'payoff1' in cols_to_keep: X_for_study['payoff1'] = PAYOFF_DICT[float(study_number)][0]
+          if 'payoff2' in cols_to_keep: X_for_study['payoff2'] = PAYOFF_DICT[float(study_number)][1]
+          if 'payoffRatio' in cols_to_keep: X_for_study['payoffRatio'] = X_for_study.payoff1 / X_for_study.payoff2
           y_for_study = data_for_study.newcomb_combined
           dataframes_for_each_study[float(study_number)] = (X_for_study, y_for_study)
   return dataframes_for_each_study
