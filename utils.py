@@ -4,10 +4,14 @@ import pandas as pd
 from sklearn.metrics import recall_score
 
 
-def split_dataset_by_study(data, feature_names, excluded_study_labels=(20,),excluded_participants=None):
+def split_dataset_by_study(data, feature_names, included_study_labels=(12,13,14,15,16,17,18),
+                           excluded_participants=None, believability_1_exclusions=[1,2],
+                           believability_2_exculsions=[2]):
   """
 
   :param data: Pandas df containing full newcomb data.
+  :param believability_1_exclusions: values of believability_1 for which to remove subjects.
+  :param believability_2_exculsions:
   :param exluded_study_labels:
   :return:
   """
@@ -49,7 +53,7 @@ def split_dataset_by_study(data, feature_names, excluded_study_labels=(20,),excl
   # Create separate dataframes for each study
   dataframes_for_each_study = {}
   for study_number in data.Study.unique():
-    if study_number not in excluded_study_labels:
+    if study_number in included_study_labels:
       data_for_study = data[data["Study"] == study_number]
 
       # Drop empty columns, then take complete cases (null values are coded as ' ', need to change to nan)
@@ -59,6 +63,8 @@ def split_dataset_by_study(data, feature_names, excluded_study_labels=(20,),excl
       data_for_study = data_for_study.applymap(float)  # ToDo: what about categorical vars?
       if data_for_study.shape[0] > 0:
         data_for_study = data_for_study[data_for_study["newcomb_combined"] != 0.0]
+        data_for_study = data_for_study[~data_for_study["believability_1"].isin(believability_1_exclusions)]
+        data_for_study = data_for_study[~data_for_study["believability_2"].isin(believability_2_exculsions)]
 
         # exclude participants if function for exclusion is given
         if excluded_participants is not None:
